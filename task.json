@@ -1,0 +1,88 @@
+{
+  "atomCode": "cmake-build",
+  "name": "CMake build",
+  "version": "1.0.0",
+  "description": "Configures with cmake and builds a target, the same shape as the maven and gradle atoms.",
+  "execution": {
+    "packagePath": "cmake-build.jar",
+    "language": "java",
+    "target": "$atom_java_path -cp cmake-build.jar com.jenkinschina.atom.sdk.AtomRunner"
+  },
+  "input": {
+    "source": {
+      "label": "源码目录",
+      "type": "vuex-input",
+      "default": "."
+    },
+    "buildDir": {
+      "label": "构建目录",
+      "type": "vuex-input",
+      "default": "build"
+    },
+    "generator": {
+      "label": "生成器（如 Ninja）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "buildType": {
+      "label": "构建类型",
+      "type": "selector",
+      "default": "Release",
+      "options": [
+        "Release",
+        "Debug",
+        "RelWithDebInfo",
+        "MinSizeRel"
+      ]
+    },
+    "target": {
+      "label": "目标（留空 = all）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "configureArgs": {
+      "label": "configure 额外参数",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "buildArgs": {
+      "label": "build 额外参数",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "jobs": {
+      "label": "并行度（0 = 工具默认）",
+      "type": "vuex-input-number",
+      "default": "0"
+    },
+    "clean": {
+      "label": "先删构建目录",
+      "type": "checkbox",
+      "default": "false"
+    }
+  },
+  "output": {
+    "buildDir": {
+      "type": "string",
+      "description": "构建目录"
+    },
+    "buildType": {
+      "type": "string",
+      "description": "构建类型"
+    },
+    "binaries": {
+      "type": "string",
+      "description": "产物数"
+    },
+    "build": {
+      "type": "artifact",
+      "description": "归档的构建目录"
+    }
+  },
+  "x-jenkins": {
+    "protocol": "jenkins-1",
+    "requires": {
+      "runner": ">=0.4.0"
+    }
+  }
+}
