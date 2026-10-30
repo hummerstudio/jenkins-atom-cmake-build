@@ -84,6 +84,7 @@ public class CmakeBuildAtom implements AtomTask {
 
         int testsPassed = 0;
         int testsFailed = 0;
+        Path junitReport = null;
         if (runTests) {
             // ctest lives next to cmake: same prefix, one level up from bin/
             String ctest = cmake.replaceAll("/cmake$", "/ctest");
@@ -99,10 +100,14 @@ public class CmakeBuildAtom implements AtomTask {
                     junitPath = args.get(i + 1);
                 }
                 if (junitPath != null && !junitPath.isBlank()) {
-                    Path parent = workspace.resolve(junitPath).normalize().getParent();
-                    if (parent != null && parent.startsWith(workspace)) {
+                    // ctest resolves a relative --output-junit inside the test directory, not the workspace
+                    Path resolved = Path.of(junitPath).isAbsolute()
+                            ? Path.of(junitPath) : buildPath.resolve(junitPath).normalize();
+                    Path parent = resolved.getParent();
+                    if (parent != null) {
                         Files.createDirectories(parent);
                     }
+                    junitReport = resolved;
                 }
             }
             List<String> test = new ArrayList<>(List.of(ctest, "--test-dir", buildPath.toString(),
@@ -136,6 +141,7 @@ public class CmakeBuildAtom implements AtomTask {
         }
 
         return AtomResult.success()
+                .data("junitReport", junitReport == null ? "" : junitReport.toString())
                 .data("testsPassed", String.valueOf(testsPassed))
                 .data("testsFailed", String.valueOf(testsFailed))
                 .data("buildDir", buildPath.toString())

@@ -1,7 +1,7 @@
 {
   "atomCode": "cmake-build",
   "name": "CMake build",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Configures with cmake and builds a target, the same shape as the maven and gradle atoms.",
   "execution": {
     "packagePath": "cmake-build.jar",
@@ -74,6 +74,11 @@
       "label": "有测试失败就让这一步失败",
       "type": "checkbox",
       "default": "true"
+    },
+    "outputJunit": {
+      "label": "同时写出 JUnit 报告（留空则只看 testArgs）",
+      "type": "vuex-input",
+      "default": ""
     }
   },
   "output": {
@@ -100,6 +105,10 @@
     "testsFailed": {
       "type": "string",
       "description": "失败的测试数"
+    },
+    "junitReport": {
+      "type": "string",
+      "description": "JUnit 报告的完整路径"
     }
   },
   "x-jenkins": {
