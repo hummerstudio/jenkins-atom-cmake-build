@@ -25,6 +25,27 @@ esac
 exit 0
 SH
 chmod +x "$work/bin/cmake"
+cat >"$work/bin/ctest" <<'SH'
+#!/usr/bin/env bash
+printf 'ctest %s\n' "$*" >> "$SMOKE_ARGV"
+testdir=""; junit=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --test-dir) testdir="$2"; shift 2 ;;
+    --output-junit) junit="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+if [ -n "$junit" ]; then
+  mkdir -p "$(dirname "$testdir/$junit")"
+  printf '<testsuites><testsuite name="ct"><testcase name="one"/></testsuite></testsuites>\n' >"$testdir/$junit"
+fi
+if [ -n "${SMOKE_TESTFAIL:-}" ]; then
+  echo "33% tests passed, 2 tests failed out of 3"; exit 8
+fi
+echo "100% tests passed, 0 tests failed out of 3"
+SH
+chmod +x "$work/bin/ctest"
 export SMOKE_ARGV="$work/argv.txt"
 
 dir="$work/build"; mkdir -p "$dir"
@@ -50,4 +71,19 @@ PATH="$work/empty:/usr/bin:/bin" run "$dir" >/dev/null 2>&1 && fail "missing cma
 grep -q "cmake is not on the PATH" "$dir/output.json" || fail "message: $(cat "$dir/output.json")"
 grep -q '"errorType":5' "$dir/output.json" || fail "ENVIRONMENT(5) expected: $(cat "$dir/output.json")"
 
-echo "smoke ok: configure args, target, parallel, failing build, missing cmake"
+# ctest runs when asked, the summary is parsed, and the report lands where ctest writes it
+dir="$work/tests"; mkdir -p "$dir"
+printf '{"runTests": "true", "testArgs": "--output-junit reports/ctest.xml"}' >"$dir/input.json"
+PATH="$work/bin:$PATH" run "$dir" >/dev/null 2>&1 || fail "run with tests failed: $(cat "$dir/output.json")"
+[ "$(output "$dir" testsPassed)" = "3" ] || fail "testsPassed: $(cat "$dir/output.json")"
+[ "$(output "$dir" testsFailed)" = "0" ] || fail "testsFailed: $(cat "$dir/output.json")"
+[ -f "$dir/build/reports/ctest.xml" ] || fail "no junit report where ctest writes it"
+grep -q "reports/ctest.xml" "$work/argv.txt" || fail "test args not passed"
+
+# a failing test fails the step unless told otherwise
+dir="$work/testfail"; mkdir -p "$dir"
+printf '{"runTests": "true"}' >"$dir/input.json"
+PATH="$work/bin:$PATH" SMOKE_TESTFAIL=1 run "$dir" >/dev/null 2>&1 && fail "a failing test must fail the atom"
+grep -q "2 failing test" "$dir/output.json" || fail "message: $(cat "$dir/output.json")"
+
+echo "smoke ok: configure args, target, parallel, ctest summary, failing test, failing build, missing cmake"
