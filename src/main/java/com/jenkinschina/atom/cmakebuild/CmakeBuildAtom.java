@@ -87,16 +87,21 @@ public class CmakeBuildAtom implements AtomTask {
         if (runTests) {
             // ctest lives next to cmake: same prefix, one level up from bin/
             String ctest = cmake.replaceAll("/cmake$", "/ctest");
-            // a report path usually points into a directory that does not exist yet; ctest will not create it
-            for (String arg : split(testArgs)) {
-                if (arg.startsWith("--output-junit") || arg.startsWith("--output-junit=")) {
-                    String junitPath = arg.contains("=") ? arg.substring(arg.indexOf('=') + 1)
-                            : context.getParam("outputJunit", "");
-                    if (!junitPath.isBlank()) {
-                        Path parent = workspace.resolve(junitPath).normalize().getParent();
-                        if (parent != null && parent.startsWith(workspace)) {
-                            Files.createDirectories(parent);
-                        }
+            // a report path usually points into a directory that does not exist yet; ctest will not create it.
+            // the flag comes either as "--output-junit=path" or as two tokens.
+            List<String> args = split(testArgs);
+            for (int i = 0; i < args.size(); i++) {
+                String arg = args.get(i);
+                String junitPath = null;
+                if (arg.startsWith("--output-junit=")) {
+                    junitPath = arg.substring("--output-junit=".length());
+                } else if (arg.equals("--output-junit") && i + 1 < args.size()) {
+                    junitPath = args.get(i + 1);
+                }
+                if (junitPath != null && !junitPath.isBlank()) {
+                    Path parent = workspace.resolve(junitPath).normalize().getParent();
+                    if (parent != null && parent.startsWith(workspace)) {
+                        Files.createDirectories(parent);
                     }
                 }
             }
