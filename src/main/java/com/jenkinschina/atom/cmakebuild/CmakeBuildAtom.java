@@ -90,10 +90,10 @@ public class CmakeBuildAtom implements AtomTask {
             // a report path usually points into a directory that does not exist yet; ctest will not create it
             for (String arg : split(testArgs)) {
                 if (arg.startsWith("--output-junit") || arg.startsWith("--output-junit=")) {
-                    String target = arg.contains("=") ? arg.substring(arg.indexOf('=') + 1)
+                    String junitPath = arg.contains("=") ? arg.substring(arg.indexOf('=') + 1)
                             : context.getParam("outputJunit", "");
-                    if (!target.isBlank()) {
-                        Path parent = workspace.resolve(target).normalize().getParent();
+                    if (!junitPath.isBlank()) {
+                        Path parent = workspace.resolve(junitPath).normalize().getParent();
                         if (parent != null && parent.startsWith(workspace)) {
                             Files.createDirectories(parent);
                         }
