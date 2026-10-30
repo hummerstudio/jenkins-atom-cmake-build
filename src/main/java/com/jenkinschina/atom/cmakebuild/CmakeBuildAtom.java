@@ -87,13 +87,29 @@ public class CmakeBuildAtom implements AtomTask {
         if (runTests) {
             // ctest lives next to cmake: same prefix, one level up from bin/
             String ctest = cmake.replaceAll("/cmake$", "/ctest");
+            // a report path usually points into a directory that does not exist yet; ctest will not create it
+            for (String arg : split(testArgs)) {
+                if (arg.startsWith("--output-junit") || arg.startsWith("--output-junit=")) {
+                    String target = arg.contains("=") ? arg.substring(arg.indexOf('=') + 1)
+                            : context.getParam("outputJunit", "");
+                    if (!target.isBlank()) {
+                        Path parent = workspace.resolve(target).normalize().getParent();
+                        if (parent != null && parent.startsWith(workspace)) {
+                            Files.createDirectories(parent);
+                        }
+                    }
+                }
+            }
             List<String> test = new ArrayList<>(List.of(ctest, "--test-dir", buildPath.toString(),
                     "--output-on-failure"));
             test.addAll(split(testArgs));
             context.log("[cmake] " + String.join(" ", test));
             Result tested = exec(workspace, context, test);
-            testsPassed = count(tested.output(), "(\\d+) tests? passed");
+            // ctest says "100% tests passed, 0 tests failed out of 1": the total is the reliable number
+            int total = count(tested.output(), "out of (\\d+)");
             testsFailed = count(tested.output(), "(\\d+) tests? failed");
+            testsPassed = Math.max(0, total - testsFailed);
+            context.log("[cmake] " + testsPassed + " passed, " + testsFailed + " failed");
             if (!tested.ok() && failOnTestFailure) {
                 return AtomResult.error(ErrorType.THIRD_PART, 40004,
                         "ctest reported " + testsFailed + " failing test(s): " + tested.tail());
