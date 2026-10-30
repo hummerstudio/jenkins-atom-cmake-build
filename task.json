@@ -1,7 +1,7 @@
 {
   "atomCode": "cmake-build",
   "name": "CMake build",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Configures with cmake and builds a target, the same shape as the maven and gradle atoms.",
   "execution": {
     "packagePath": "cmake-build.jar",
@@ -59,6 +59,21 @@
       "label": "先删构建目录",
       "type": "checkbox",
       "default": "false"
+    },
+    "runTests": {
+      "label": "构建后跑 ctest",
+      "type": "checkbox",
+      "default": "false"
+    },
+    "testArgs": {
+      "label": "ctest 额外参数（如 --output-junit reports/ctest.xml）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "failOnTestFailure": {
+      "label": "有测试失败就让这一步失败",
+      "type": "checkbox",
+      "default": "true"
     }
   },
   "output": {
@@ -77,6 +92,14 @@
     "build": {
       "type": "artifact",
       "description": "归档的构建目录"
+    },
+    "testsPassed": {
+      "type": "string",
+      "description": "通过的测试数"
+    },
+    "testsFailed": {
+      "type": "string",
+      "description": "失败的测试数"
     }
   },
   "x-jenkins": {

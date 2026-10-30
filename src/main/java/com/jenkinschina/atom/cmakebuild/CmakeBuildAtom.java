@@ -32,6 +32,9 @@ public class CmakeBuildAtom implements AtomTask {
         String configureArgs = context.getParam("configureArgs", "");
         String buildArgs = context.getParam("buildArgs", "");
         int jobs = context.getIntParam("jobs", 0);
+        boolean runTests = context.getBooleanParam("runTests", false);
+        String testArgs = context.getParam("testArgs", "");
+        boolean failOnTestFailure = context.getBooleanParam("failOnTestFailure", true);
         boolean clean = context.getBooleanParam("clean", false);
 
         String cmake = resolve("cmake");
@@ -79,6 +82,24 @@ public class CmakeBuildAtom implements AtomTask {
                     "cmake build failed (" + built.code() + "): " + built.tail());
         }
 
+        int testsPassed = 0;
+        int testsFailed = 0;
+        if (runTests) {
+            // ctest lives next to cmake: same prefix, one level up from bin/
+            String ctest = cmake.replaceAll("/cmake$", "/ctest");
+            List<String> test = new ArrayList<>(List.of(ctest, "--test-dir", buildPath.toString(),
+                    "--output-on-failure"));
+            test.addAll(split(testArgs));
+            context.log("[cmake] " + String.join(" ", test));
+            Result tested = exec(workspace, context, test);
+            testsPassed = count(tested.output(), "(\\d+) tests? passed");
+            testsFailed = count(tested.output(), "(\\d+) tests? failed");
+            if (!tested.ok() && failOnTestFailure) {
+                return AtomResult.error(ErrorType.THIRD_PART, 40004,
+                        "ctest reported " + testsFailed + " failing test(s): " + tested.tail());
+            }
+        }
+
         long artifacts = 0;
         try (var walk = Files.walk(buildPath, 6)) {
             artifacts = walk.filter(Files::isRegularFile)
@@ -94,10 +115,21 @@ public class CmakeBuildAtom implements AtomTask {
         }
 
         return AtomResult.success()
+                .data("testsPassed", String.valueOf(testsPassed))
+                .data("testsFailed", String.valueOf(testsFailed))
                 .data("buildDir", buildPath.toString())
                 .data("buildType", buildType)
                 .data("binaries", String.valueOf(artifacts))
                 .artifact("build", buildDir);
+    }
+
+    private static int count(String text, String pattern) {
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(pattern).matcher(text);
+        int total = 0;
+        while (matcher.find()) {
+            total += Integer.parseInt(matcher.group(1));
+        }
+        return total;
     }
 
     private static void deleteTree(Path path) throws Exception {
