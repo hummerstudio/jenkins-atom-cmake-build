@@ -13,11 +13,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * cmake as an atom: configure into a build directory, then build a target.
+ * cmake as an atom: configure into a build directory, build a target, install it.
  *
  * <p>Same shape as the maven and gradle atoms: a tool the agent has, wrapped so a job does not have to spell out the
  * command line. The configure step is separate because its output (CMakeCache, compiler detection) is what people
- * actually debug.
+ * actually debug. The install half follows the cmakebuilder plugin: a preload script ({@code -C}), an install prefix,
+ * a clean install directory, and an install command of your own.
  */
 public class CmakeBuildAtom implements AtomTask {
 
@@ -36,11 +37,41 @@ public class CmakeBuildAtom implements AtomTask {
         String testArgs = context.getParam("testArgs", "");
         boolean failOnTestFailure = context.getBooleanParam("failOnTestFailure", true);
         boolean clean = context.getBooleanParam("clean", false);
+        String preloadScript = context.getParam("preloadScript", "");
+        String installDir = context.getParam("installDir", "");
+        String installCommand = context.getParam("installCommand", "");
+        boolean cleanInstallDir = context.getBooleanParam("cleanInstallDir", false);
 
         String cmake = resolve("cmake");
         if (cmake == null) {
             return AtomResult.error(ErrorType.ENVIRONMENT, 40001,
                     "cmake is not on the PATH of this agent; install it or set the source/toolchain on the node");
+        }
+
+        // the plugin deletes the build dir before it looks at the source; checking the source first is the same
+        // outcome for a bad source and does not leave the workspace half wiped
+        Path sourcePath = workspace.resolve(source).normalize();
+        if (!Files.isDirectory(sourcePath)) {
+            return AtomResult.error(ErrorType.USER, 40010,
+                    "source directory does not exist: " + sourcePath);
+        }
+
+        Path preloadPath = null;
+        if (!preloadScript.isBlank()) {
+            preloadPath = workspace.resolve(preloadScript).normalize();
+            if (!Files.isRegularFile(preloadPath)) {
+                return AtomResult.error(ErrorType.USER, 40011,
+                        "preload script does not exist: " + preloadPath);
+            }
+        }
+
+        Path installPath = null;
+        if (!installDir.isBlank()) {
+            installPath = workspace.resolve(installDir).normalize();
+            if (cleanInstallDir) {
+                deleteTree(installPath);
+            }
+            Files.createDirectories(installPath);
         }
 
         Path buildPath = workspace.resolve(buildDir);
@@ -49,12 +80,20 @@ public class CmakeBuildAtom implements AtomTask {
         }
         Files.createDirectories(buildPath);
 
-        List<String> configure = new ArrayList<>(List.of(cmake, "-S", workspace.resolve(source).toString(),
-                "-B", buildPath.toString(), "-DCMAKE_BUILD_TYPE=" + buildType));
+        List<String> configure = new ArrayList<>(List.of(cmake, "-S", sourcePath.toString(),
+                "-B", buildPath.toString()));
+        if (preloadPath != null) {
+            configure.add("-C");
+            configure.add(preloadPath.toString());
+        }
         if (!generator.isBlank()) {
             configure.add("-G");
             configure.add(generator);
         }
+        if (installPath != null) {
+            configure.add("-DCMAKE_INSTALL_PREFIX=" + installPath);
+        }
+        configure.add("-DCMAKE_BUILD_TYPE=" + buildType);
         configure.addAll(split(configureArgs));
 
         context.log("[cmake] " + String.join(" ", configure));
@@ -80,6 +119,28 @@ public class CmakeBuildAtom implements AtomTask {
         if (!built.ok()) {
             return AtomResult.error(ErrorType.THIRD_PART, 40003,
                     "cmake build failed (" + built.code() + "): " + built.tail());
+        }
+
+        long installedFiles = 0;
+        if (installPath != null) {
+            // the plugin runs the install command with the build directory as its working directory
+            List<String> install = installCommand.isBlank()
+                    ? new ArrayList<>(List.of(cmake, "--install", buildPath.toString()))
+                    : split(installCommand);
+            context.log("[cmake] " + String.join(" ", install));
+            Result did = exec(buildPath, context, install);
+            if (!did.ok()) {
+                return AtomResult.error(ErrorType.THIRD_PART, 40005,
+                        "cmake install failed (" + did.code() + "): " + did.tail());
+            }
+            try (var walk = Files.walk(installPath)) {
+                installedFiles = walk.filter(Files::isRegularFile).count();
+            }
+            if (installedFiles == 0) {
+                // an install that wrote nothing is not a successful install; the plugin would say nothing at all
+                return AtomResult.error(ErrorType.THIRD_PART, 40006,
+                        "cmake install wrote no file under " + installPath);
+            }
         }
 
         int testsPassed = 0;
@@ -140,14 +201,20 @@ public class CmakeBuildAtom implements AtomTask {
             // counting is informational
         }
 
-        return AtomResult.success()
+        AtomResult answer = AtomResult.success()
                 .data("junitReport", junitReport == null ? "" : junitReport.toString())
                 .data("testsPassed", String.valueOf(testsPassed))
                 .data("testsFailed", String.valueOf(testsFailed))
                 .data("buildDir", buildPath.toString())
                 .data("buildType", buildType)
                 .data("binaries", String.valueOf(artifacts))
+                .data("installDir", installPath == null ? "" : installPath.toString())
+                .data("installedFiles", String.valueOf(installedFiles))
                 .artifact("build", buildDir);
+        if (installPath != null) {
+            answer = answer.artifact("install", installDir);
+        }
+        return answer;
     }
 
     private static int count(String text, String pattern) {
@@ -191,9 +258,9 @@ public class CmakeBuildAtom implements AtomTask {
         return null;
     }
 
-    private static Result exec(Path workspace, AtomContext context, List<String> command) {
+    private static Result exec(Path directory, AtomContext context, List<String> command) {
         try {
-            ProcessBuilder builder = new ProcessBuilder(command).directory(workspace.toFile()).redirectErrorStream(true);
+            ProcessBuilder builder = new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true);
             Process process = builder.start();
             StringBuilder all = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(

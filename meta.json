@@ -1,11 +1,12 @@
 {
   "name": "CMake build",
-  "summary": "Configures with cmake and builds a target, the same shape as the maven and gradle atoms.",
+  "summary": "Configures with cmake, builds a target and installs into a prefix (the cmakebuilder plugin's install half: preload script, install prefix, clean install dir, install command).",
   "author": "hummerstudio",
   "license": "MIT",
   "tags": [
     "official-port",
-    "cmake-build"
+    "cmake-build",
+    "cmakebuilder"
   ],
   "homepage": "https://github.com/hummerstudio/jenkins-atom-cmake-build"
 }

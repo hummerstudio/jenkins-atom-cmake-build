@@ -1,8 +1,8 @@
 {
   "atomCode": "cmake-build",
   "name": "CMake build",
-  "version": "1.2.0",
-  "description": "Configures with cmake and builds a target, the same shape as the maven and gradle atoms.",
+  "version": "1.3.0",
+  "description": "Configures with cmake, builds a target and optionally installs it into a prefix, the same shape as the maven and gradle atoms.",
   "execution": {
     "packagePath": "cmake-build.jar",
     "language": "java",
@@ -21,6 +21,11 @@
     },
     "generator": {
       "label": "生成器（如 Ninja）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "preloadScript": {
+      "label": "预载脚本 -C（相对工作区，插件的 Preload Script）",
       "type": "vuex-input",
       "default": ""
     },
@@ -60,6 +65,11 @@
       "type": "checkbox",
       "default": "false"
     },
+    "cleanInstallDir": {
+      "label": "先清空安装目录（插件里的 Wipeout Install Dir）",
+      "type": "checkbox",
+      "default": "false"
+    },
     "runTests": {
       "label": "构建后跑 ctest",
       "type": "checkbox",
@@ -77,6 +87,16 @@
     },
     "outputJunit": {
       "label": "同时写出 JUnit 报告（留空则只看 testArgs）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "installDir": {
+      "label": "安装目录（相对工作区，留空则只构建不安装）",
+      "type": "vuex-input",
+      "default": ""
+    },
+    "installCommand": {
+      "label": "安装命令（在构建目录里执行，留空则 cmake --install）",
       "type": "vuex-input",
       "default": ""
     }
@@ -109,6 +129,18 @@
     "junitReport": {
       "type": "string",
       "description": "JUnit 报告的完整路径"
+    },
+    "installDir": {
+      "type": "string",
+      "description": "安装目录（未安装时为空）"
+    },
+    "installedFiles": {
+      "type": "string",
+      "description": "安装到安装目录的文件数"
+    },
+    "install": {
+      "type": "artifact",
+      "description": "归档的安装目录（仅在设置了安装目录时）"
     }
   },
   "x-jenkins": {
