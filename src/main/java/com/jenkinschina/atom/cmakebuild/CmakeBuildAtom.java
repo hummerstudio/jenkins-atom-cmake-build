@@ -152,6 +152,12 @@ public class CmakeBuildAtom implements AtomTask {
             // a report path usually points into a directory that does not exist yet; ctest will not create it.
             // the flag comes either as "--output-junit=path" or as two tokens.
             List<String> args = split(testArgs);
+            String declaredJunit = context.getParam("outputJunit", "").trim();
+            if (!declaredJunit.isEmpty()) {
+                // outputJunit was declared in task.json and never read: the caller asked for a report and ctest
+                // was never told to write one. It means the same as --output-junit in testArgs, resolved identically.
+                args.add("--output-junit=" + declaredJunit);
+            }
             for (int i = 0; i < args.size(); i++) {
                 String arg = args.get(i);
                 String junitPath = null;
@@ -173,7 +179,7 @@ public class CmakeBuildAtom implements AtomTask {
             }
             List<String> test = new ArrayList<>(List.of(ctest, "--test-dir", buildPath.toString(),
                     "--output-on-failure"));
-            test.addAll(split(testArgs));
+            test.addAll(args);   // args carries the declared outputJunit too, so the report is actually written
             context.log("[cmake] " + String.join(" ", test));
             Result tested = exec(workspace, context, test);
             // ctest says "100% tests passed, 0 tests failed out of 1": the total is the reliable number

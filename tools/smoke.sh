@@ -33,6 +33,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --test-dir) testdir="$2"; shift 2 ;;
     --output-junit) junit="$2"; shift 2 ;;
+    --output-junit=*) junit="${1#--output-junit=}"; shift ;;
     *) shift ;;
   esac
 done
@@ -79,6 +80,13 @@ PATH="$work/bin:$PATH" run "$dir" >/dev/null 2>&1 || fail "run with tests failed
 [ "$(output "$dir" testsFailed)" = "0" ] || fail "testsFailed: $(cat "$dir/output.json")"
 [ -f "$dir/build/reports/ctest.xml" ] || fail "no junit report where ctest writes it"
 grep -q "reports/ctest.xml" "$work/argv.txt" || fail "test args not passed"
+
+# the declared outputJunit input actually reaches ctest (it was declared and ignored)
+dir="$work/junitparam"; mkdir -p "$dir"
+printf '{"runTests": "true", "outputJunit": "reports/declared.xml"}' >"$dir/input.json"
+PATH="$work/bin:$PATH" run "$dir" >/dev/null 2>&1 || fail "run with outputJunit failed: $(cat "$dir/output.json")"
+[ -f "$dir/build/reports/declared.xml" ] || fail "outputJunit was declared but no report was written"
+grep -q -- "--output-junit=reports/declared.xml" "$work/argv.txt" || fail "outputJunit never reached ctest"
 
 # a failing test fails the step unless told otherwise
 dir="$work/testfail"; mkdir -p "$dir"
