@@ -31,14 +31,13 @@ every generator, `make install` only with makefiles.
 - `installDir`, `installCommand` and `preloadScript` are resolved against the workspace and handed to cmake as
   absolute paths; the plugin passes whatever the job typed.
 
-## Build and smoke test
+## Build and test
 
 ```bash
-./build.sh
-./tools/smoke.sh
+mvn verify
 ```
 
-The smoke test has two halves. A fake `cmake`/`ctest` proves the argument shape (`-DCMAKE_BUILD_TYPE`, `--target`,
+The tests have two halves. A fake `cmake`/`ctest` proves the argument shape (`-DCMAKE_BUILD_TYPE`, `--target`,
 `--parallel`, the ctest report path), the failing-build and missing-tool paths. A **real** cmake and C compiler,
 when the machine has them, prove the install half: `-C` lands in CMakeCache, the prefix is passed, the binary
 appears under `<installDir>/bin`, `cleanInstallDir` wipes a stale file, an install that writes nothing fails, a
