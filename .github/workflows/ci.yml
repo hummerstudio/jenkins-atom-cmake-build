@@ -37,4 +37,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cmake-build-atom
-          path: atom/dist/cmake-build/
+          path: atom/target/dist/cmake-build/
